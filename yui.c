@@ -2,6 +2,12 @@
 
 static Direction lookDir;
 static char charging;
+static int auxHP;
+static int damage;
+static char goodCondition;
+static char shoot;
+static char aux;
+static char tmp;
 
 int valid(Position p, int m, int n) {
 	return p.x >= 0 && p.x < m && p.y >= 0 && p.y < n;
@@ -9,6 +15,12 @@ int valid(Position p, int m, int n) {
 
 void prepareGame(Grid *g, Position p, int turnCount) {
 	charging = 0;
+	auxHP = 100;
+	goodCondition = 1;
+	damage = 0;
+	shoot = 0;
+	aux = 1;
+	tmp = 0;
 	setName("Yui");
 }
 
@@ -55,10 +67,18 @@ char find(Grid *g, Position p, int (*check)(Tile*)) {
 
 Action processTurn(Grid *g, Position p, int turnsLeft) {
 	Robot *r = &g->map[p.x][p.y].object.robot;
-	if(r->bullets == 0 || charging) {
+	if (r->hp == auxHP)
+		damage = 0;
+	if (r->hp <auxHP)
+		damage++;
+	if (r->hp < 30)
+		goodCondition = 0;
+	auxHP = r->hp;
+
+	if((r->bullets == 0 || charging) && damage < 1) {
 		charging = 1;
 		if(g->map[p.x][p.y].isControlPoint) {
-			if(r->bullets >= 30)
+			if(r->bullets >= 20)
 				charging = 0;
 			return STAND;
 		}
@@ -73,16 +93,29 @@ Action processTurn(Grid *g, Position p, int turnsLeft) {
 		else
 			return TURN_LEFT;
 	}
-	else if(find(g, p, isRobot)) {
-		if(((6 + lookDir - r->dir) % 6) <= 1) {
+	else if(find(g, p, isRobot) && goodCondition) {
+		if(lookDir - r->dir == 0) {
 			playSong("morra.ogg");
 			return shoot(r->dir, lookDir);
 		}
-		else
+		else if (((lookDir - r->dir) % 6) >= -1 && ((lookDir - r->dir) % 6) <= 1)
 			return bestTurn(r->dir, lookDir);
+		else if (damaged < 2)
+			return bestTurn (r->dir, lookDir);
+		else
+			return WALK;
 	}
-	else if(valid(getNeighbor(p, r->dir), g->m, g->n))
+	else if (goodCondition == 0 && damage != 0) {
+		if (lookDir - r->dir == 0)
+		 return TURN_LEFT;
+		return WALK; 
+	}
+	else if(valid(getNeighbor(p, r->dir), g->m, g->n) && aux) {
+		aux = 0;
+		return OBSTACLE_CENTER;
+	}
+	else {
+		aux = 1;
 		return WALK;
-	else
-		return TURN_LEFT;
+	}
 }
